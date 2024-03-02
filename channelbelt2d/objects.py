@@ -1,6 +1,8 @@
 # Channel belt object for meandering river deposition
 import numpy as np
+from scipy.stats import norm, truncnorm
 from scipy.interpolate import UnivariateSpline, LSQUnivariateSpline
+from dataclasses import dataclass
 
 class MeanderBelt:
     def __init__(self, x, y, w, h):
@@ -67,6 +69,129 @@ class BraidedBelt:
     def plot(self, ax):
         ax.fill_between(self._x, self._top_depth, self._base_depth,
                         color='goldenrod', edgecolor='black')
+
+
+@dataclass
+class WingedBeltParameterRealization:
+    left_wing_width: float
+    right_wing_width: float
+    base_belt_width: float
+    top_belt_width: float
+    belth_thickness: float
+    superelevation: float
+
+
+class WingedBeltObject:
+    def __init__(self, center_location, floodplain_elevation, params: WingedBeltParameterRealization):
+        self._center_location = center_location
+        self._floodplain_elevation = floodplain_elevation
+        self._left_wing_width = params.left_wing_width
+        self._right_wing_width = params.right_wing_width
+        self._base_belt_width = params.base_belt_width
+        self._top_belt_width = params.top_belt_width
+        self._belt_thickness = params.belth_thickness
+        self._superelevation = params.superelevation
+    
+    def plot(self, ax, n=100):
+        self._plot_belt_center(ax, n)
+
+        self._plot_left_slope(ax, n)
+        self._plot_right_slope(ax, n)
+
+        self._plot_left_wing(ax, n)
+        self._plot_right_wing(ax, n)
+        
+    def _plot_belt_center(self, ax, n):
+        x_left = self._center_location - self._base_belt_width / 2
+        x_right = self._center_location + self._base_belt_width / 2
+        x_top = np.linspace(x_left, x_right, n)
+        top_depth = self._floodplain_elevation - self._superelevation
+        base_depth = self._floodplain_elevation + self._belt_thickness - self._superelevation
+        y_top = np.full(n, top_depth)
+        y_base = np.full(n, base_depth)
+
+        ax.fill_between(x_top, y_top, y_base, color='goldenrod', edgecolor='black')
+    
+    def _plot_left_slope(self, ax, n):
+        x_left = self._center_location - self._top_belt_width / 2
+        x_right = self._center_location - self._base_belt_width / 2
+        x = np.linspace(x_left, x_right, n)
+        top_depth = self._floodplain_elevation - self._superelevation
+        left_base_depth = self._floodplain_elevation
+        right_base_depth = self._floodplain_elevation + self._belt_thickness - self._superelevation
+        y_top = np.full(n, top_depth)
+        y_base = np.linspace(left_base_depth, right_base_depth, n)
+
+        ax.fill_between(x, y_top, y_base, color='goldenrod', edgecolor='black')
+    
+    def _plot_right_slope(self, ax, n):
+        x_left = self._center_location + self._base_belt_width / 2
+        x_right = self._center_location + self._top_belt_width / 2
+        x = np.linspace(x_left, x_right, n)
+        top_depth = self._floodplain_elevation - self._superelevation
+        left_base_depth = self._floodplain_elevation + self._belt_thickness - self._superelevation
+        right_base_depth = self._floodplain_elevation
+        y_top = np.full(n, top_depth)
+        y_base = np.linspace(left_base_depth, right_base_depth, n)
+
+        ax.fill_between(x, y_top, y_base, color='goldenrod', edgecolor='black')
+    
+    def _plot_left_wing(self, ax, n):
+        x_left = self._center_location - self._top_belt_width / 2 - self._left_wing_width
+        x_right = self._center_location - self._top_belt_width / 2
+        x = np.linspace(x_left, x_right, n)
+        left_depth = self._floodplain_elevation
+        right_depth = self._floodplain_elevation - self._superelevation
+        y_top = np.linspace(left_depth, right_depth, n)
+        y_base = np.full(n, left_depth)
+
+        ax.fill_between(x, y_top, y_base, color='goldenrod', edgecolor='black')
+
+    def _plot_right_wing(self, ax, n):
+        x_left = self._center_location + self._top_belt_width / 2
+        x_right = self._center_location + self._top_belt_width / 2 + self._right_wing_width
+        x = np.linspace(x_left, x_right, n)
+        left_depth = self._floodplain_elevation - self._superelevation
+        right_depth = self._floodplain_elevation
+        y_top = np.linspace(left_depth, right_depth, n)
+        y_base = np.full(n, right_depth)
+
+        ax.fill_between(x, y_top, y_base, color='goldenrod', edgecolor='black')
+
+
+class WingedBeltParameterDistribution:
+    def __init__(self,
+                    left_wing_width,
+                    right_wing_width,
+                    base_belt_width,
+                    top_belt_width,
+                    belth_thickness,
+                    superelevation):
+            self._left_wing_width = left_wing_width
+            self._right_wing_width = right_wing_width
+            self._base_belt_width = base_belt_width
+            self._top_belt_width = top_belt_width
+            self._belt_thickness = belth_thickness
+            self._superelevation = superelevation
+        
+    def draw_realization(self):
+        # The top width distribution is truncated below at the base width
+        base_belt_width = self._base_belt_width.rvs()
+        truncation_threshold = (base_belt_width - self._base_belt_width.mean()) / self._base_belt_width.std()
+        top_belt_width_distribution_truncated = truncnorm(a=truncation_threshold,
+                                                          b=np.inf,
+                                                          loc=self._top_belt_width.mean(),
+                                                          scale=self._top_belt_width.std())
+        top_belt_width = top_belt_width_distribution_truncated.rvs()
+
+        return WingedBeltParameterRealization(
+            left_wing_width=self._left_wing_width.rvs(),
+            right_wing_width=self._right_wing_width.rvs(),
+            base_belt_width=base_belt_width,
+            top_belt_width=top_belt_width,
+            belth_thickness=self._belt_thickness.rvs(),
+            superelevation=self._superelevation.rvs()
+        )
 
 
 # Probability distributions of parameters controlling channel belts
