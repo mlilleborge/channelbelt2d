@@ -8,29 +8,42 @@ on a floodplain, as seen in a strike-oriented cross section.
 
 ## Usage
 
-These scripts can be run to make figures:
+### Scripts
 
 - 00_braided_single_object.py
 - 01_braided_process.py
 - 02_meandering_process.py
+- 03_winged_belt_single_object.py
 
 
-These parameters can be changed:
+### Parameters
 
 - Valley parameters
     - width
     - depth
     - initial level
 
-- Belt parameters
+- Object geometry (braided and meandering belts)
     - aggradation
     - channel depth
     - belt elevation
     - belt width
 
-- Process parameters (currently only used by the braided river process)
-    - topographic relief sensitivity (gamma)
+- Object geometry (winged belts)
+    - center_location
+    - floodplain_elevation
+    - left_wing_width
+    - right_wing_width
+    - base_belt_width
+    - top_belt_width
+    - belth_thickness
+    - superelevation
 
+- Additional process parameters (braided process)
+    - topographic relief sensitivity
+
+
+![Geometric parameters for winged belt objects](images/winged_belt_params.png)
 
 ## Background
 
