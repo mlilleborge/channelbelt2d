@@ -1,6 +1,9 @@
-import matplotlib.pyplot as plt
-from channelbelts import MeanderingRiverDeposition, ValleyParameters, BeltParameters
 from scipy.stats import norm
+import matplotlib.pyplot as plt
+
+from channelbelt2d.processes import MeanderingRiverDeposition
+from channelbelt2d.environments import ValleyParameters
+from channelbelt2d.objects import BeltParameters
 
 ####################################################################
 # Example usage: Meandering river
@@ -21,7 +24,6 @@ from scipy.stats import norm
 # vertical accretion siltstones and mudstones. Vertical scale is
 # highly exaggerated.
 ####################################################################
-fig, ax = plt.subplots(figsize=(8, 4))
 
 # Define valley geometry
 valley_parameters = ValleyParameters(width=100, depth=100, initial_level=90)
@@ -40,9 +42,12 @@ number_of_belts = 5
 for i in range(number_of_belts):
     depositional_process.draw_belt()
 
-# Plot resulting deposit
-depositional_process._plot_valley(ax)   # Plot the valley
-depositional_process._plot_belts(ax)    # Plot all the meander belts
+fig, ax = plt.subplots(figsize=(8, 4))
 
-ax.invert_yaxis() # Reverse the y-axis
+# Plot resulting deposit
+depositional_process._plot_valley(ax)
+depositional_process._plot_belts(ax)
+
+# Reverse the y-axis
+ax.invert_yaxis()
 plt.show()

@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from channelbelts import BraidedBelt, TopographicLowDistribution, Valley, ValleyParameters
+
+from channelbelt2d.objects import BraidedBelt
+from channelbelt2d.distributions import TopographicLowDistribution
+from channelbelt2d.environments import Valley, ValleyParameters
 
 #################################################################
 # Testing: Braided river
