@@ -45,8 +45,8 @@ belt_parameters = BeltParameters(aggradation = norm(loc=6, scale=1),
 depositional_process = BraidedRiverDeposition(valley_parameters, belt_parameters, gamma=0.1)
 
 # Target output
-make_animation = True
-make_figure = False
+make_animation = False
+make_figure = True
 
 # Check that exactly one of the two options is selected
 assert make_animation != make_figure
