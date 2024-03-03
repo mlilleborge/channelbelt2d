@@ -12,11 +12,11 @@ distribution = WingedBeltParameterDistribution(
     superelevation=norm(loc=2, scale=0.5)
 )
 
-realizaton = distribution.draw_realization()
+realization = distribution.draw_realization()
 
 winged_belt = WingedBeltObject(center_location=0,
                                floodplain_elevation=0,
-                               params=realizaton)
+                               params=realization)
 
 # Plot the winged belt object
 fig = plt.figure()
