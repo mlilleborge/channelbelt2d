@@ -6,6 +6,35 @@ from channelbelt2d.objects import MeanderBelt, BraidedBelt
 from channelbelt2d.distributions import TopographicLowDistribution
 
 
+class FluvialDepositionalProcess:
+    """Base class for fluvial depositional processes.
+    Start by making it work for winged belt objects and Gibbs distributions.
+    Then make it work for existing meandering and braided river systems."""
+    def __init__(self,
+                 initial_topography_parameters,
+                 object_parameters,
+                 process_parameters):
+        self._initial_topography_parameters = initial_topography_parameters
+        self._object_parameters = object_parameters
+        self._process_parameters = process_parameters
+    
+    def _draw_next_object(self):
+        pass
+
+    def plot_system(self, ax):
+        pass
+
+
+
+
+
+
+
+
+
+
+
+
 # Meandering river depositional process
 class MeanderingRiverDeposition:
     def __init__(self, valley_parameters, belt_parameters):
