@@ -2,37 +2,116 @@ from copy import copy
 import numpy as np
 
 from channelbelt2d.environments import Valley
-from channelbelt2d.objects import MeanderBelt, BraidedBelt
-from channelbelt2d.distributions import TopographicLowDistribution
+from channelbelt2d.objects import MeanderBelt, BraidedBelt, WingedBeltObject
+from channelbelt2d.distributions import TopographicLowDistribution, PotentialCalculator, GibbsDistribution
+
+
+class Event:
+    """An event is an object together with its associated parameters
+       and the top surface after deposition
+    """
+    def __init__(self, object, surface):
+        self._object = object
+        self._top_surface = surface
+
+    def plot(self, ax, xx, *args, **kwargs):
+        self._object.plot(ax, *args, **kwargs)
+        ax.plot(xx, self._top_surface, *args, **kwargs)
 
 
 class FluvialDepositionalProcess:
     """Base class for fluvial depositional processes.
-    Start by making it work for winged belt objects and Gibbs distributions.
-    Then make it work for existing meandering and braided river systems."""
+       Currently works for winged belt objects and Gibbs distributions.
+       Should be made to also work for existing meandering and braided river systems.
+    """
     def __init__(self,
+                 grid_parameters,
                  initial_topography_parameters,
-                 object_parameters,
-                 process_parameters):
-        self._initial_topography_parameters = initial_topography_parameters
-        self._object_parameters = object_parameters
-        self._process_parameters = process_parameters
-    
-    def _draw_next_object(self):
-        pass
+                 object_behavior,
+                 process_behavior):
+        self._xx = self._initialize_xaxis(grid_parameters)
+
+        self._zz = np.full_like(self._xx, initial_topography_parameters['floodplain_depth'])
+        self._zz_initial = copy(self._zz)
+
+        self._object_type = object_behavior['object_type']
+        self._object_parameter_distribution = object_behavior['parameter_distribution']
+
+        self._process_behavior = process_behavior
+
+        self._events = []
 
     def plot_system(self, ax):
-        pass
+        for event in self._events:
+            event.plot(ax, self._xx)
 
+    def draw_next_object(self):
+        potential_contributions = self._make_potential_contributions()
+        potential_calculator = PotentialCalculator(self._xx, potential_contributions)
+        potential = potential_calculator.compute_potential()
+        location_distribution = GibbsDistribution(potential_calculator._xx, potential)
 
+        # Draw all parameters needed to define the object
+        location = location_distribution.draw()
+        object_parameters = self._object_parameter_distribution.draw_realization()
 
+        new_object = self._make_object(location, object_parameters, self._object_type)
 
+        # Update topography
+        self._zz = np.maximum(self._zz, new_object.get_top_surface(self._xx))
 
+        self._events.append(Event(new_object, self._zz))
 
+    def _initialize_xaxis(self, grid_parameters):
+        """Initialize the x-axis for the process grid.
+           grid_parameters: dictionary with keys 'x_min', 'x_max', 'n_x'
+        """
+        x_min = grid_parameters['x_min']
+        x_max = grid_parameters['x_max']
+        n_x = grid_parameters['n_x']        
+        return np.linspace(x_min, x_max, n_x)
 
+    def _make_potential_contributions(self):
+        potential_contributions = {}
+        for key, value in self._process_behavior.items():
+            if key == 'topography':
+                covariate = self._zz
+            elif key == 'erodibility':
+                covariate = self._current_erodibility()
+            else:
+                raise ValueError(f"Unknown potential contribution type: {key}")
 
+            coefficient = value['coefficient']
+            potential_contributions[key] = {'covariate': covariate, 'coefficient': coefficient}
+        return potential_contributions
 
+    def _current_erodibility(self):
+        erodibility = np.zeros_like(self._xx)
 
+        if self._events:
+            most_recent_event = self._events[-1]
+            x_left, x_right = most_recent_event._object.get_x_limits()
+            erodibility[np.logical_and(x_left <= self._xx, self._xx <= x_right)] = 1.0
+        
+        return erodibility
+    
+    def _make_object(self, location, object_parameters, object_type):
+        if object_type == 'winged_belt':
+            x_left = location - object_parameters.base_belt_width / 2
+            x_right = location + object_parameters.base_belt_width / 2
+            local_floodplain_elevation = self._local_depth(x_left, x_right)
+            return WingedBeltObject(center_location=location,
+                                    floodplain_elevation=local_floodplain_elevation,
+                                    params=object_parameters)
+        elif object_type == 'meander_belt':
+            raise NotImplementedError("Meander belt objects not yet supported by this process.")
+        elif object_type == 'braided_belt':
+            raise NotImplementedError("Braided belt objects not yet supported by this process.")
+        else:
+            raise ValueError(f"Unknown object type: {object_type}")
+    
+    def _local_depth(self, x_left, x_right):
+        return self._zz[np.logical_and(x_left <= self._xx, self._xx <= x_right)].mean()
 
 
 # Meandering river depositional process

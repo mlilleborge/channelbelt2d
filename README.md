@@ -15,6 +15,7 @@ on a floodplain, as seen in a strike-oriented cross section.
 - 02_meandering_process.py
 - 03_winged_belt_single_object.py
 - 04_potential_distribution.py
+- 05_fluvial_process_winged_belts.py
 
 
 ### Parameters
@@ -40,8 +41,9 @@ on a floodplain, as seen in a strike-oriented cross section.
     - belth_thickness
     - superelevation
 
-- Additional process parameters (braided process)
+- Process parameters
     - topographic relief sensitivity
+    - erodibility sensitivity
 
 
 ![Geometric parameters for winged belt objects](images/winged_belt_params.png)

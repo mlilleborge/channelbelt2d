@@ -157,6 +157,28 @@ class WingedBeltObject:
         y_base = np.full(n, right_depth)
 
         ax.fill_between(x, y_top, y_base, color='goldenrod', edgecolor='black')
+    
+    def get_top_surface(self, xx):
+        zz = np.full(xx.size, self._floodplain_elevation)
+        x_left_ramp_start = self._center_location - self._top_belt_width / 2 - self._left_wing_width
+        x_left_ramp_end = self._center_location - self._top_belt_width / 2
+        x_right_ramp_start = self._center_location + self._top_belt_width / 2
+        x_right_ramp_end = self._center_location + self._top_belt_width / 2 + self._right_wing_width
+
+        for i, x_i in enumerate(xx):
+            if x_left_ramp_start <= x_i <= x_left_ramp_end:
+                zz[i] -= (x_i - x_left_ramp_start) / (x_left_ramp_end - x_left_ramp_start) * self._superelevation
+            elif x_left_ramp_end <= x_i <= x_right_ramp_start:
+                zz[i] -= self._superelevation
+            elif x_right_ramp_start <= x_i <= x_right_ramp_end:
+                zz[i] -= (x_right_ramp_end - x_i) / (x_right_ramp_end - x_right_ramp_start) * self._superelevation
+        
+        return zz
+    
+    def get_x_limits(self):
+        x_left = self._center_location - self._top_belt_width / 2 - self._left_wing_width
+        x_right = self._center_location + self._top_belt_width / 2 + self._right_wing_width
+        return x_left, x_right
 
 
 class WingedBeltParameterDistribution:
