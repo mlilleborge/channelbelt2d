@@ -14,6 +14,7 @@ on a floodplain, as seen in a strike-oriented cross section.
 - 01_braided_process.py
 - 02_meandering_process.py
 - 03_winged_belt_single_object.py
+- 04_potential_distribution.py
 
 
 ### Parameters
