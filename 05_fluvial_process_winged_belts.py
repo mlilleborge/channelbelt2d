@@ -32,8 +32,8 @@ obj_behavior = {"object_type": "winged_belt", "parameter_distribution": obj_para
 
 # Define process behavior
 proc_behavior = {
-    "topography": {"coefficient": -3.0},
-    "erodibility": {"coefficient": 0.0},
+    "topography": {"coefficient": -1.0},
+    "erodibility": {"coefficient": -3.0},
 }
 
 color_table = {
@@ -57,7 +57,7 @@ process = FluvialDepositionalProcess(
 )
 
 # Draw a few objects
-n_objects = 5
+n_objects = 50
 for i in range(n_objects):
     process.draw_next_object()
 

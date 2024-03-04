@@ -3,8 +3,7 @@
 Playing around with simple rule-based generation of channel belt objects
 on a floodplain, as seen in a strike-oriented cross section.
 
-![](images/braided.gif)
-
+![](images/stacks_2x3.png)
 
 ## Usage
 
@@ -71,6 +70,7 @@ overbank floodplain sediments. Periodic stream avulsion may create new
 channels over time, leading to formation of several linear sand bodies
 within a major stream valley (Fig. 12).
 
+![](images/braided.gif)
 
 ## References
 
