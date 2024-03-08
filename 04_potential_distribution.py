@@ -32,12 +32,9 @@ for i, x_i in enumerate(x):
 
 
 # Define the potential contributions
-gamma = 2.0
-beta = -3.0
-
 potential_contributions = {
-    "topography": {"covariate": depth, "coefficient": -gamma},
-    "erodibility": {"covariate": erodibility, "coefficient": beta},
+    "topography": {"covariate": depth, "coefficient": -1},
+    "erodibility": {"covariate": erodibility, "coefficient": -2},
 }
 
 potential_calculator = PotentialCalculator(

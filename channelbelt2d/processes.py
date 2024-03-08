@@ -55,8 +55,16 @@ class FluvialDepositionalProcess:
 
         self._object_type = object_behavior["object_type"]
         self._object_parameter_distribution = object_behavior["parameter_distribution"]
+        self._migration_displacement_distribution = object_behavior[
+            "migration_displacement_distribution"
+        ]
 
-        self._process_behavior = process_behavior
+        self._location_factors = process_behavior["location_factors"]
+        self._avulsion_parameters = process_behavior["avulsion_parameters"]
+        self._floodplain_aggradation_parameters = process_behavior[
+            "floodplain_aggradation_parameters"
+        ]
+
         self._color_table = self._parse_color_table(visual_settings)
 
         self._events = []
@@ -109,21 +117,109 @@ class FluvialDepositionalProcess:
         )
 
     def draw_next_object(self):
-        potential_contributions = self._make_potential_contributions()
-        potential_calculator = PotentialCalculator(self._xx, potential_contributions)
-        potential = potential_calculator.compute_potential()
-        location_distribution = GibbsDistribution(potential_calculator._xx, potential)
+        # Choose whether an avulsion occurs
+        avulsion = (
+            np.random.rand() < self._avulsion_parameters["avulsion_probability"]
+            or not self._events
+        )
+        if avulsion:
+            # Choose whether the avulsion occurs outside the grid
+            outside = (
+                np.random.rand() < self._avulsion_parameters["outside_probability"]
+            )
+            if outside:
+                # Outside avulsion case:
+                # - Don't add a new object
+                # - Update topography using avulsion aggradation
+                self._zz = np.maximum(
+                    self._zz,
+                    self._zz
+                    - self._floodplain_aggradation_parameters["avulsion_aggradation"],
+                )
 
-        # Draw all parameters needed to define the object
-        location = location_distribution.draw()
-        object_parameters = self._object_parameter_distribution.draw_realization()
+            else:
+                # Inside avulsion case:
+                # - Add a new object normally
+                # - Update topography using avulsion aggradation
+                potential_contributions = self._make_potential_contributions()
+                potential_calculator = PotentialCalculator(
+                    self._xx, potential_contributions
+                )
+                potential = potential_calculator.compute_potential()
+                location_distribution = GibbsDistribution(
+                    potential_calculator._xx, potential
+                )
 
-        new_object = self._make_object(location, object_parameters, self._object_type)
+                # Draw all parameters needed to define the object
+                location = location_distribution.draw()
+                object_parameters = (
+                    self._object_parameter_distribution.draw_realization()
+                )
 
-        # Update topography
-        self._zz = np.minimum(self._zz, new_object.get_top_surface(self._xx))
+                new_object = self._make_object(
+                    location, object_parameters, self._object_type
+                )
 
-        self._events.append(Event(new_object, self._zz))
+                # Update topography
+                self._zz = np.minimum(self._zz, new_object.get_top_surface(self._xx))
+
+                self._events.append(Event(new_object, self._zz))
+
+                # Aggrade using avulsion aggradation
+                self._zz = np.maximum(
+                    self._zz,
+                    self._zz
+                    - self._floodplain_aggradation_parameters["avulsion_aggradation"],
+                )
+
+        else:
+            # Non-avulsion (migration) case:
+            # - Add a new object by drawing parameters and location with
+            #   the previous object's parameters as the mean
+            # - Update topography using non-avulsion aggradation
+
+            # Get the previous object's parameters
+            if self._events:
+                previous_object = self._events[-1]._object
+
+                # Draw new parameters
+                new_object_parameters = (
+                    self._object_parameter_distribution.draw_realization()
+                )
+
+                # Get the location and floodplain elevation of the previous object
+                previous_location = previous_object._center_location
+                previous_floodplain_elevation = previous_object._floodplain_elevation
+
+                # Draw a 2-element vector with a horizontal and vertical displacement
+                # for the location and floodplain elevation of the new object
+                displacement = self._migration_displacement_distribution.draw()
+                new_location = previous_location + displacement[0]
+                new_floodplain_elevation = (
+                    previous_floodplain_elevation - displacement[1]
+                )
+
+                # Make new object
+                new_object = self._make_object(
+                    new_location, new_object_parameters, self._object_type
+                )
+
+                # Set the floodplain elevation of the new object
+                new_object._floodplain_elevation = new_floodplain_elevation
+
+                # Update topography
+                self._zz = np.minimum(self._zz, new_object.get_top_surface(self._xx))
+
+                self._events.append(Event(new_object, self._zz))
+
+                # Aggrade using non-avulsion aggradation
+                self._zz = np.maximum(
+                    self._zz,
+                    self._zz
+                    - self._floodplain_aggradation_parameters[
+                        "non_avulsion_aggradation"
+                    ],
+                )
 
     def _initialize_xaxis(self, grid_parameters):
         """Initialize the x-axis for the process grid.
@@ -136,7 +232,7 @@ class FluvialDepositionalProcess:
 
     def _make_potential_contributions(self):
         potential_contributions = {}
-        for key, value in self._process_behavior.items():
+        for key, value in self._location_factors.items():
             if key == "topography":
                 covariate = self._zz
             elif key == "erodibility":
