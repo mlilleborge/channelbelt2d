@@ -296,13 +296,14 @@ class WingedBeltObject:
             else:
                 return self._floodplain_elevation - self._superelevation
 
-    def get_x_limits(self):
-        x_left = (
-            self._center_location - self._top_belt_width / 2 - self._left_wing_width
-        )
-        x_right = (
-            self._center_location + self._top_belt_width / 2 + self._right_wing_width
-        )
+    def get_x_limits(self, include_wings=True):
+        x_left = self._center_location - self._top_belt_width / 2
+        x_right = self._center_location + self._top_belt_width / 2
+
+        if include_wings:
+            x_left -= self._left_wing_width
+            x_right += self._right_wing_width
+
         return x_left, x_right
 
 

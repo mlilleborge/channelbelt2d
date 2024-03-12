@@ -67,6 +67,9 @@ class GibbsDistribution:
     def plot_pdf(self, ax, *args, **kwargs):
         ax.plot(self._xx, self._pdf, *args, **kwargs)
 
+    def pdf_values(self):
+        return self._pdf
+
 
 # A probability distribution that concentrates probability mass at topographic lows
 class TopographicLowDistribution:

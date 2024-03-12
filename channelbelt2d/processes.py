@@ -1,5 +1,6 @@
 from copy import copy
 import numpy as np
+from scipy.stats import norm
 
 from channelbelt2d.environments import Valley
 from channelbelt2d.objects import MeanderBelt, BraidedBelt, WingedBeltObject
@@ -11,9 +12,7 @@ from channelbelt2d.distributions import (
 
 
 class Event:
-    """An event is an object together with its associated parameters
-    and the top surface after deposition
-    """
+    """An event is an object together with its associated top surface after deposition"""
 
     def __init__(self, object, surface):
         self._object = object
@@ -64,6 +63,7 @@ class FluvialDepositionalProcess:
         self._floodplain_aggradation_parameters = process_behavior[
             "floodplain_aggradation_parameters"
         ]
+        self._erodibility_determination = process_behavior["erodibility_determination"]
 
         self._color_table = self._parse_color_table(visual_settings)
 
@@ -80,7 +80,7 @@ class FluvialDepositionalProcess:
     def plot_topography(self, ax, *args, **kwargs):
         ax.plot(self._xx, self._zz, *args, **kwargs)
 
-    def plot_background(self, ax, set_limits=True):
+    def plot_background(self, ax, set_limits=True, aspect_ratio=0.001):
         # get x limits for process
         x_min = self._xx.min()
         x_max = self._xx.max()
@@ -90,7 +90,9 @@ class FluvialDepositionalProcess:
         mean_thickness = self._object_parameter_distribution._belt_thickness.mean()
         y_max = self._zz_initial.max() + mean_thickness
         plot_height_without_margin = y_max - y_min
-        margin = 0.1 * plot_height_without_margin
+        plot_width = x_max - x_min
+        target_plot_height = plot_width * aspect_ratio
+        margin = target_plot_height / plot_height_without_margin - 1.0
         y_min -= margin
         y_max += margin
 
@@ -115,6 +117,39 @@ class FluvialDepositionalProcess:
             facecolor=self._color_table["floodplain"],
             edgecolor="face",
         )
+
+    def plot_next_object_location_pdf(
+        self,
+        ax,
+        *args,
+        include_avulsion=True,
+        include_migration=True,
+        include_combined=True,
+        **kwargs,
+    ):
+        avulsion_distribution = self._make_avulsion_location_distribution()
+        migration_density = self._migration_location_distribution_pdf_values()
+
+        avulsion_probability = self._avulsion_parameters["avulsion_probability"]
+
+        if include_avulsion:
+            avulsion_distribution.plot_pdf(ax, *args, label="Avulsion", **kwargs)
+
+        if include_migration:
+            ax.plot(
+                self._xx,
+                migration_density,
+                *args,
+                label="Migration",
+                **kwargs,
+            )
+
+        if include_combined:
+            combined_pdf = (
+                avulsion_probability * avulsion_distribution.pdf_values()
+                + (1 - avulsion_probability) * migration_density
+            )
+            ax.plot(self._xx, combined_pdf, *args, label="Combined", **kwargs)
 
     def draw_next_object(self):
         # Choose whether an avulsion occurs
@@ -247,13 +282,36 @@ class FluvialDepositionalProcess:
             }
         return potential_contributions
 
-    def _current_erodibility(self):
-        erodibility = np.zeros_like(self._xx)
+    def _depth_to_sand(self):
+        depth_to_sand = np.full_like(self._xx, np.inf)
 
-        if self._events:
-            most_recent_event = self._events[-1]
-            x_left, x_right = most_recent_event._object.get_x_limits()
-            erodibility[np.logical_and(x_left <= self._xx, self._xx <= x_right)] = 1.0
+        for event in self._events:
+            x_left, x_right = event._object.get_x_limits(include_wings=False)
+
+            # Update depth_to_sand in the belt region of the object
+            inside_event = np.logical_and(x_left <= self._xx, self._xx <= x_right)
+
+            depth_to_sand[inside_event] = np.minimum(
+                depth_to_sand[inside_event],
+                event._object.get_top_surface(self._xx[inside_event])
+                - self._zz[inside_event],
+            )
+
+        return depth_to_sand
+
+    def _current_erodibility(self, sensing_depth=None):
+        if sensing_depth is None:
+            mean_thickness = self._object_parameter_distribution._belt_thickness.mean()
+            mean_superelevation = (
+                self._object_parameter_distribution._superelevation.mean()
+            )
+            mean_incision_depth = mean_thickness - mean_superelevation
+            sensing_depth = mean_incision_depth
+
+        depth_to_sand = self._depth_to_sand()
+        erodibility = np.maximum(
+            0, self._erodibility_determination["mapping"](depth_to_sand / sensing_depth)
+        )
 
         return erodibility
 
@@ -279,7 +337,19 @@ class FluvialDepositionalProcess:
             raise ValueError(f"Unknown object type: {object_type}")
 
     def _local_depth(self, x_left, x_right):
-        return self._zz[np.logical_and(x_left <= self._xx, self._xx <= x_right)].mean()
+        inside_event = np.logical_and(x_left <= self._xx, self._xx <= x_right)
+
+        if not inside_event.any():
+            print(
+                f"Warning: no overlap between object and process grid at x = {x_left} to x = {x_right}."
+            )
+
+            # Fall back to using the closest grid point to the center of the object
+            x_center = (x_left + x_right) / 2
+            closest_index = np.argmin(np.abs(self._xx - x_center))
+            return self._zz[closest_index]
+
+        return self._zz[inside_event].mean()
 
     def _parse_color_table(self, visual_settings):
         """Parse the color table from the visual settings.
@@ -290,6 +360,32 @@ class FluvialDepositionalProcess:
         for key, value in color_table.items():
             color_table[key] = tuple([x / 255 for x in value])
         return color_table
+
+    def _make_avulsion_location_distribution(self):
+        potential_contributions = self._make_potential_contributions()
+        potential_calculator = PotentialCalculator(self._xx, potential_contributions)
+        potential = potential_calculator.compute_potential()
+        location_distribution = GibbsDistribution(potential_calculator._xx, potential)
+        return location_distribution
+
+    def _migration_location_distribution_pdf_values(self):
+        previous_object = self._events[-1]._object
+        mu_h_left = (
+            previous_object._center_location
+            - self._migration_displacement_distribution._distribution.mean[0]
+        )
+        mu_h_right = (
+            previous_object._center_location
+            + self._migration_displacement_distribution._distribution.mean[0]
+        )
+        sigma_h = (
+            self._migration_displacement_distribution._distribution.cov[0, 0] ** 0.5
+        )
+
+        left_density = norm.pdf(self._xx, loc=mu_h_left, scale=sigma_h)
+        right_density = norm.pdf(self._xx, loc=mu_h_right, scale=sigma_h)
+
+        return (left_density + right_density) * 0.5
 
 
 # Meandering river depositional process

@@ -31,8 +31,8 @@ obj_param_distr = WingedBeltParameterDistribution(
 
 migr_distr = MigrationDisplacementDistribution(
     parameters={
-        "mean": {"horizontal": 400, "vertical": 1.0},
-        "standard_deviation": {"horizontal": 50, "vertical": 0.05},
+        "mean": {"horizontal": 300, "vertical": 1.0},
+        "standard_deviation": {"horizontal": 150, "vertical": 0.05},
         "correlation": 0.0,
     }
 )
@@ -58,6 +58,11 @@ proc_behavior = {
         "non_avulsion_aggradation": 1.0,
         "avulsion_aggradation": 3.0,
     },
+    "erodibility_determination": {
+        "mapping": lambda x: 1 - x,
+        "input variable": "depth to sand / sensing depth",
+        "output variable": "erodibility",
+    },
 }
 
 visual_settings = {
@@ -78,8 +83,8 @@ process = FluvialDepositionalProcess(
     visual_settings=visual_settings,
 )
 
-# Draw a few objects
-n_objects = 40
+# Draw objects
+n_objects = 30
 for i in range(n_objects):
     process.draw_next_object()
 
@@ -87,7 +92,7 @@ for i in range(n_objects):
 # Plot the state of the process
 fig, ax = plt.subplots(1, 1, figsize=(8, 4))
 
-process.plot_background(ax, set_limits=True)
+process.plot_background(ax, set_limits=True, aspect_ratio=0.05)
 
 process.plot_objects(ax, include_wings=True, include_outline=False)
 process.plot_objects(ax, include_wings=False, include_outline=True)
@@ -98,5 +103,26 @@ process.plot_topography(ax, linewidth=2, color="black")
 ax.invert_yaxis()
 ax.set_xlabel("x")
 ax.set_ylabel("Depth")
+
+# Plot the current erodibility
+if True:
+    fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+
+    erodibility = process._current_erodibility()
+    ax.plot(process._xx, erodibility, color="black", linewidth=2)
+    ax.set_xlabel("x")
+    ax.set_ylabel("Erodibility")
+    ax.set_xlim(grid_params["x_min"], grid_params["x_max"])
+
+# Plot the PDF of the location of the next object
+if True:
+    fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+    process.plot_next_object_location_pdf(
+        ax, include_avulsion=True, include_migration=True, include_combined=True
+    )
+    ax.set_xlabel("x")
+    ax.set_ylabel("Probability density")
+    ax.legend()
+    ax.set_xlim(grid_params["x_min"], grid_params["x_max"])
 
 plt.show()
