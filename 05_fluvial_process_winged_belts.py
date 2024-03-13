@@ -52,7 +52,7 @@ proc_behavior = {
     },
     "avulsion_parameters": {
         "avulsion_probability": 0.5,
-        "outside_probability": 0.1,
+        "outside_probability": 0.0,
     },
     "floodplain_aggradation_parameters": {
         "non_avulsion_aggradation": 1.0,
@@ -84,7 +84,7 @@ process = FluvialDepositionalProcess(
 )
 
 # Draw objects
-n_objects = 30
+n_objects = 150
 for i in range(n_objects):
     process.draw_next_object()
 
@@ -92,7 +92,7 @@ for i in range(n_objects):
 # Plot the state of the process
 fig, ax = plt.subplots(1, 1, figsize=(8, 4))
 
-process.plot_background(ax, set_limits=True, aspect_ratio=0.05)
+process.plot_background(ax, set_limits=True, aspect_ratio=0.025)
 
 process.plot_objects(ax, include_wings=True, include_outline=False)
 process.plot_objects(ax, include_wings=False, include_outline=True)

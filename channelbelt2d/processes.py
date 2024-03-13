@@ -166,9 +166,9 @@ class FluvialDepositionalProcess:
                 # Outside avulsion case:
                 # - Don't add a new object
                 # - Update topography using avulsion aggradation
-                self._zz = np.maximum(
+                self._zz = np.minimum(
                     self._zz,
-                    self._zz
+                    self._zz.mean()
                     - self._floodplain_aggradation_parameters["avulsion_aggradation"],
                 )
 
@@ -201,9 +201,9 @@ class FluvialDepositionalProcess:
                 self._events.append(Event(new_object, self._zz))
 
                 # Aggrade using avulsion aggradation
-                self._zz = np.maximum(
+                self._zz = np.minimum(
                     self._zz,
-                    self._zz
+                    self._zz.mean()
                     - self._floodplain_aggradation_parameters["avulsion_aggradation"],
                 )
 
@@ -248,9 +248,9 @@ class FluvialDepositionalProcess:
                 self._events.append(Event(new_object, self._zz))
 
                 # Aggrade using non-avulsion aggradation
-                self._zz = np.maximum(
+                self._zz = np.minimum(
                     self._zz,
-                    self._zz
+                    self._zz.mean()
                     - self._floodplain_aggradation_parameters[
                         "non_avulsion_aggradation"
                     ],
