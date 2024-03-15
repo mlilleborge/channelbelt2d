@@ -213,34 +213,33 @@ class FluvialDepositionalProcess:
                 previous_object = self._events[-1]._object
 
                 # Update topography: Aggrade using non-avulsion aggradation
-                self._update_topography_with_aggradation(
-                    self._floodplain_aggradation_parameters["non_avulsion_aggradation"]
-                )
+                aggradation_level = self._floodplain_aggradation_parameters["non_avulsion_aggradation"]
+                self._update_topography_with_aggradation(aggradation_level)
+                forced_new_floodplain_elevation = previous_object._floodplain_elevation - aggradation_level
 
                 # Draw new parameters
                 new_object_parameters = (
                     self._object_parameter_distribution.draw_realization()
                 )
 
-                # Get the location and floodplain elevation of the previous object
-                previous_location = previous_object._center_location
-                previous_floodplain_elevation = previous_object._floodplain_elevation
-
                 # Draw a 2-element vector with a horizontal and vertical displacement
                 # for the location and floodplain elevation of the new object
                 displacement = self._migration_displacement_distribution.draw()
-                new_location = previous_location + displacement[0]
-                new_floodplain_elevation = (
-                    previous_floodplain_elevation - displacement[1]
-                )
+
+                # Use horizontal displacement to calculate new belt center from previous belt center
+                new_location = previous_object._center_location + displacement[0]
+
+                # "Superelevation and aggradation are not used for building the belt in this case" (Agustin's .pptx):
+                # inherit center thickness of previous object, and adjust superelevation according to vert'l displ'nt
+                new_object_parameters.belth_thickness = previous_object._belt_thickness
+                new_object_parameters.superelevation = (
+                        previous_object._superelevation + (displacement[1] - aggradation_level)
+                )  # high vertical displacement compared to aggradation level -> increased superelevation
 
                 # Make new object
                 new_object = self._make_object(
-                    new_location, new_object_parameters, self._object_type
+                    new_location, new_object_parameters, self._object_type, forced_new_floodplain_elevation
                 )
-
-                # Set the floodplain elevation of the new object
-                new_object._floodplain_elevation = new_floodplain_elevation
 
                 # Update topography part 1:
                 self._update_topography_with_object(new_object)
@@ -319,12 +318,12 @@ class FluvialDepositionalProcess:
 
         return erodibility
 
-    def _make_object(self, location, object_parameters, object_type):
+    def _make_object(self, location, object_parameters, object_type, forced_fe=None):
         if object_type == "winged_belt":
             # Procedure to determine depth of object base:
-            x_left = location - object_parameters.base_belt_width / 2
-            x_right = location + object_parameters.base_belt_width / 2
-            local_floodplain_elevation = self._local_depth_in_range(x_left, x_right)
+            x_left = location - 0.5 * object_parameters.top_belt_width
+            x_right = location + 0.5 * object_parameters.top_belt_width
+            local_floodplain_elevation = self._local_depth_in_range(x_left, x_right) if forced_fe is None else forced_fe
             # Procedure to determine depth of each wing: shallower than floodplain iff. wing rests on previous object
             wing_elevation_lhs = min(local_floodplain_elevation, self._local_depth(x_left))
             wing_elevation_rhs = min(local_floodplain_elevation, self._local_depth(x_right))
