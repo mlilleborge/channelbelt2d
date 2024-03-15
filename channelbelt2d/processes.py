@@ -164,8 +164,8 @@ class FluvialDepositionalProcess:
             )
             if outside:
                 # Outside avulsion case:
-                # - Don't add a new object
-                # - Update topography using avulsion aggradation
+                # - Don't add a new object (no "part 1")
+                # - Update topography "part 2": Aggrade using avulsion aggradation
                 self._zz = np.minimum(
                     self._zz,
                     self._zz.mean()
@@ -195,12 +195,12 @@ class FluvialDepositionalProcess:
                     location, object_parameters, self._object_type
                 )
 
-                # Update topography
+                # Update topography part 1: Make it shallower where top surface of new object is above old topography
                 self._zz = np.minimum(self._zz, new_object.get_top_surface(self._xx))
 
                 self._events.append(Event(new_object, self._zz))
 
-                # Aggrade using avulsion aggradation
+                # Update topography part 2: Aggrade using avulsion aggradation
                 self._zz = np.minimum(
                     self._zz,
                     self._zz.mean()
@@ -242,12 +242,12 @@ class FluvialDepositionalProcess:
                 # Set the floodplain elevation of the new object
                 new_object._floodplain_elevation = new_floodplain_elevation
 
-                # Update topography
+                # Update topography part 1: Make it shallower where top surface of new object is above old topography
                 self._zz = np.minimum(self._zz, new_object.get_top_surface(self._xx))
 
                 self._events.append(Event(new_object, self._zz))
 
-                # Aggrade using non-avulsion aggradation
+                # Update topography part 2: Aggrade using non-avulsion aggradation
                 self._zz = np.minimum(
                     self._zz,
                     self._zz.mean()
@@ -317,13 +317,19 @@ class FluvialDepositionalProcess:
 
     def _make_object(self, location, object_parameters, object_type):
         if object_type == "winged_belt":
+            # Procedure to determine depth of object base:
             x_left = location - object_parameters.base_belt_width / 2
             x_right = location + object_parameters.base_belt_width / 2
             local_floodplain_elevation = self._local_depth(x_left, x_right)
+            # Procedure to determine depth of each wing:
+            local_depth_lhs = self._zz[np.argmin(np.abs(self._xx - x_left))]  # depth of gridpoint closest to wing joint
+            local_depth_rhs = self._zz[np.argmin(np.abs(self._xx - x_right))]
             return WingedBeltObject(
                 center_location=location,
                 floodplain_elevation=local_floodplain_elevation,
                 params=object_parameters,
+                left_wing_elevation=min(local_floodplain_elevation, local_depth_lhs),  # shallower wing iff. it rests on previous object
+                right_wing_elevation=min(local_floodplain_elevation, local_depth_rhs)
             )
         elif object_type == "meander_belt":
             raise NotImplementedError(

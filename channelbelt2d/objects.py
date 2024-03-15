@@ -95,9 +95,13 @@ class WingedBeltObject:
         center_location,
         floodplain_elevation,
         params: WingedBeltParameterRealization,
+        left_wing_elevation=None,
+        right_wing_elevation=None
     ):
         self._center_location = center_location
         self._floodplain_elevation = floodplain_elevation
+        self._left_wing_elevation = floodplain_elevation if left_wing_elevation is None else left_wing_elevation
+        self._right_wing_elevation = floodplain_elevation if right_wing_elevation is None else right_wing_elevation
         self._left_wing_width = params.left_wing_width
         self._right_wing_width = params.right_wing_width
         self._base_belt_width = params.base_belt_width
@@ -124,19 +128,18 @@ class WingedBeltObject:
             if include_wings:
                 self._plot_left_wing_top_and_base(ax, n, color="black", linewidth=1)
                 self._plot_right_wing_top_and_base(ax, n, color="black", linewidth=1)
-
-        if include_outline and not include_wings:
-            # Plot left and right vertical edges
-            x_left = self._center_location - self._top_belt_width / 2
-            x_right = self._center_location + self._top_belt_width / 2
-            y_left_top = self._floodplain_elevation - self._superelevation
-            y_left_base = self._floodplain_elevation
-            y_right_top = self._floodplain_elevation - self._superelevation
-            y_right_base = self._floodplain_elevation
-            ax.plot([x_left, x_left], [y_left_top, y_left_base], color="black", lw=1)
-            ax.plot(
-                [x_right, x_right], [y_right_top, y_right_base], color="black", lw=1
-            )
+            else:
+                # Plot left and right vertical edges
+                x_left = self._center_location - self._top_belt_width / 2
+                x_right = self._center_location + self._top_belt_width / 2
+                y_left_top = self._floodplain_elevation - self._superelevation
+                y_left_base = self._left_wing_elevation
+                y_right_top = self._floodplain_elevation - self._superelevation
+                y_right_base = self._right_wing_elevation
+                ax.plot([x_left, x_left], [y_left_top, y_left_base], color="black", lw=1)
+                ax.plot(
+                    [x_right, x_right], [y_right_top, y_right_base], color="black", lw=1
+                )
 
     def _plot_belt_center(self, ax, n, *args, **kwargs):
         x_left = self._center_location - self._base_belt_width / 2
@@ -156,7 +159,7 @@ class WingedBeltObject:
         x_right = self._center_location - self._base_belt_width / 2
         x = np.linspace(x_left, x_right, n)
         top_depth = self._floodplain_elevation - self._superelevation
-        left_base_depth = self._floodplain_elevation
+        left_base_depth = self._left_wing_elevation
         right_base_depth = (
             self._floodplain_elevation + self._belt_thickness - self._superelevation
         )
@@ -173,7 +176,7 @@ class WingedBeltObject:
         left_base_depth = (
             self._floodplain_elevation + self._belt_thickness - self._superelevation
         )
-        right_base_depth = self._floodplain_elevation
+        right_base_depth = self._right_wing_elevation
         y_top = np.full(n, top_depth)
         y_base = np.linspace(left_base_depth, right_base_depth, n)
 
@@ -185,7 +188,7 @@ class WingedBeltObject:
         )
         x_right = self._center_location - self._top_belt_width / 2
         x = np.linspace(x_left, x_right, n)
-        left_depth = self._floodplain_elevation
+        left_depth = self._left_wing_elevation
         right_depth = self._floodplain_elevation - self._superelevation
         y_top = np.linspace(left_depth, right_depth, n)
         y_base = np.full(n, left_depth)
@@ -199,7 +202,7 @@ class WingedBeltObject:
         )
         x = np.linspace(x_left, x_right, n)
         left_depth = self._floodplain_elevation - self._superelevation
-        right_depth = self._floodplain_elevation
+        right_depth = self._right_wing_elevation
         y_top = np.linspace(left_depth, right_depth, n)
         y_base = np.full(n, right_depth)
 
@@ -210,7 +213,7 @@ class WingedBeltObject:
         x_right = self._center_location - self._base_belt_width / 2
         x = np.array([x_left, x_right])
         top_depth = self._floodplain_elevation - self._superelevation
-        left_base_depth = self._floodplain_elevation
+        left_base_depth = self._left_wing_elevation
         right_base_depth = (
             self._floodplain_elevation + self._belt_thickness - self._superelevation
         )
@@ -242,7 +245,7 @@ class WingedBeltObject:
         left_base_depth = (
             self._floodplain_elevation + self._belt_thickness - self._superelevation
         )
-        right_base_depth = self._floodplain_elevation
+        right_base_depth = self._right_wing_elevation
         y_top = np.array([top_depth, top_depth])
         y_base = np.array([left_base_depth, right_base_depth])
 
@@ -255,7 +258,7 @@ class WingedBeltObject:
         )
         x_right = self._center_location - self._top_belt_width / 2
         x = np.array([x_left, x_right])
-        left_depth = self._floodplain_elevation
+        left_depth = self._left_wing_elevation
         right_depth = self._floodplain_elevation - self._superelevation
         y_top = np.array([left_depth, right_depth])
         y_base = np.array([left_depth, left_depth])
@@ -270,7 +273,7 @@ class WingedBeltObject:
         )
         x = np.array([x_left, x_right])
         left_depth = self._floodplain_elevation - self._superelevation
-        right_depth = self._floodplain_elevation
+        right_depth = self._right_wing_elevation
         y_top = np.array([left_depth, right_depth])
         y_base = np.array([right_depth, right_depth])
 
@@ -289,10 +292,16 @@ class WingedBeltObject:
             x_b = self._center_location + self._top_belt_width / 2
             if x < x_a:
                 t = (x - x_left) / (x_a - x_left)
-                return self._floodplain_elevation - self._superelevation * t
+                wing_depth_range = self._superelevation + (
+                        self._left_wing_elevation - self._floodplain_elevation
+                )
+                return self._left_wing_elevation - wing_depth_range * t
             elif x > x_b:
                 t = (x - x_b) / (x_right - x_b)
-                return self._floodplain_elevation - self._superelevation * (1 - t)
+                wing_depth_range = self._superelevation + (
+                        self._right_wing_elevation - self._floodplain_elevation
+                )
+                return self._right_wing_elevation - wing_depth_range * (1 - t)
             else:
                 return self._floodplain_elevation - self._superelevation
 
