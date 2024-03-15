@@ -164,16 +164,20 @@ class FluvialDepositionalProcess:
             )
             if outside:
                 # Outside avulsion case:
-                # - Don't add a new object (no "part 1")
-                # - Update topography "part 2": Aggrade using avulsion aggradation
+                # - Update topography: Aggrade using avulsion aggradation
+                self._update_topography_with_aggradation(
+                    self._floodplain_aggradation_parameters["avulsion_aggradation"]
+                )
+                # - Don't add a new object
+
+            else:
+                # Inside avulsion case:
+                # Update topography: Aggrade using avulsion aggradation
                 self._update_topography_with_aggradation(
                     self._floodplain_aggradation_parameters["avulsion_aggradation"]
                 )
 
-            else:
-                # Inside avulsion case:
                 # - Add a new object normally
-                # - Update topography using avulsion aggradation
                 potential_contributions = self._make_potential_contributions()
                 potential_calculator = PotentialCalculator(
                     self._xx, potential_contributions
@@ -198,11 +202,6 @@ class FluvialDepositionalProcess:
 
                 self._events.append(Event(new_object, self._zz))
 
-                # Update topography part 2: Aggrade using avulsion aggradation
-                self._update_topography_with_aggradation(
-                    self._floodplain_aggradation_parameters["avulsion_aggradation"]
-                )
-
         else:
             # Non-avulsion (migration) case:
             # - Add a new object by drawing parameters and location with
@@ -212,6 +211,11 @@ class FluvialDepositionalProcess:
             # Get the previous object's parameters
             if self._events:
                 previous_object = self._events[-1]._object
+
+                # Update topography: Aggrade using non-avulsion aggradation
+                self._update_topography_with_aggradation(
+                    self._floodplain_aggradation_parameters["non_avulsion_aggradation"]
+                )
 
                 # Draw new parameters
                 new_object_parameters = (
@@ -242,11 +246,6 @@ class FluvialDepositionalProcess:
                 self._update_topography_with_object(new_object)
 
                 self._events.append(Event(new_object, self._zz))
-
-                # Update topography part 2: Aggrade using non-avulsion aggradation
-                self._update_topography_with_aggradation(
-                    self._floodplain_aggradation_parameters["non_avulsion_aggradation"]
-                )
 
     def _update_topography_with_object(self, new_object):
         """Make topography shallower where top surface of new object is above old topography
