@@ -166,10 +166,8 @@ class FluvialDepositionalProcess:
                 # Outside avulsion case:
                 # - Don't add a new object (no "part 1")
                 # - Update topography "part 2": Aggrade using avulsion aggradation
-                self._zz = np.minimum(
-                    self._zz,
-                    self._zz.mean()
-                    - self._floodplain_aggradation_parameters["avulsion_aggradation"],
+                self._update_topography_with_aggradation(
+                    self._floodplain_aggradation_parameters["avulsion_aggradation"]
                 )
 
             else:
@@ -196,15 +194,13 @@ class FluvialDepositionalProcess:
                 )
 
                 # Update topography part 1: Make it shallower where top surface of new object is above old topography
-                self._zz = np.minimum(self._zz, new_object.get_top_surface(self._xx))
+                self._update_topography_with_object(new_object)
 
                 self._events.append(Event(new_object, self._zz))
 
                 # Update topography part 2: Aggrade using avulsion aggradation
-                self._zz = np.minimum(
-                    self._zz,
-                    self._zz.mean()
-                    - self._floodplain_aggradation_parameters["avulsion_aggradation"],
+                self._update_topography_with_aggradation(
+                    self._floodplain_aggradation_parameters["avulsion_aggradation"]
                 )
 
         else:
@@ -242,19 +238,28 @@ class FluvialDepositionalProcess:
                 # Set the floodplain elevation of the new object
                 new_object._floodplain_elevation = new_floodplain_elevation
 
-                # Update topography part 1: Make it shallower where top surface of new object is above old topography
-                self._zz = np.minimum(self._zz, new_object.get_top_surface(self._xx))
+                # Update topography part 1:
+                self._update_topography_with_object(new_object)
 
                 self._events.append(Event(new_object, self._zz))
 
                 # Update topography part 2: Aggrade using non-avulsion aggradation
-                self._zz = np.minimum(
-                    self._zz,
-                    self._zz.mean()
-                    - self._floodplain_aggradation_parameters[
-                        "non_avulsion_aggradation"
-                    ],
+                self._update_topography_with_aggradation(
+                    self._floodplain_aggradation_parameters["non_avulsion_aggradation"]
                 )
+
+    def _update_topography_with_object(self, new_object):
+        """Make topography shallower where top surface of new object is above old topography
+        """
+        self._zz = np.minimum(self._zz, new_object.get_top_surface(self._xx))
+
+    def _update_topography_with_aggradation(self, aggradation: float):
+        """Make topography shallower by filling out the deepest areas
+        """
+        self._zz = np.minimum(
+            self._zz,
+            self._zz.max() - aggradation,
+        )
 
     def _initialize_xaxis(self, grid_parameters):
         """Initialize the x-axis for the process grid.
@@ -320,16 +325,16 @@ class FluvialDepositionalProcess:
             # Procedure to determine depth of object base:
             x_left = location - object_parameters.base_belt_width / 2
             x_right = location + object_parameters.base_belt_width / 2
-            local_floodplain_elevation = self._local_depth(x_left, x_right)
-            # Procedure to determine depth of each wing:
-            local_depth_lhs = self._zz[np.argmin(np.abs(self._xx - x_left))]  # depth of gridpoint closest to wing joint
-            local_depth_rhs = self._zz[np.argmin(np.abs(self._xx - x_right))]
+            local_floodplain_elevation = self._local_depth_in_range(x_left, x_right)
+            # Procedure to determine depth of each wing: shallower than floodplain iff. wing rests on previous object
+            wing_elevation_lhs = min(local_floodplain_elevation, self._local_depth(x_left))
+            wing_elevation_rhs = min(local_floodplain_elevation, self._local_depth(x_right))
             return WingedBeltObject(
                 center_location=location,
                 floodplain_elevation=local_floodplain_elevation,
                 params=object_parameters,
-                left_wing_elevation=min(local_floodplain_elevation, local_depth_lhs),  # shallower wing iff. it rests on previous object
-                right_wing_elevation=min(local_floodplain_elevation, local_depth_rhs)
+                left_wing_elevation=wing_elevation_lhs,
+                right_wing_elevation=wing_elevation_rhs
             )
         elif object_type == "meander_belt":
             raise NotImplementedError(
@@ -342,20 +347,21 @@ class FluvialDepositionalProcess:
         else:
             raise ValueError(f"Unknown object type: {object_type}")
 
-    def _local_depth(self, x_left, x_right):
+    def _local_depth_in_range(self, x_left, x_right):
         inside_event = np.logical_and(x_left <= self._xx, self._xx <= x_right)
 
         if not inside_event.any():
             print(
                 f"Warning: no overlap between object and process grid at x = {x_left} to x = {x_right}."
             )
-
             # Fall back to using the closest grid point to the center of the object
-            x_center = (x_left + x_right) / 2
-            closest_index = np.argmin(np.abs(self._xx - x_center))
-            return self._zz[closest_index]
+            return self._local_depth(0.5 * (x_left + x_right))
 
         return self._zz[inside_event].mean()
+
+    def _local_depth(self, x):
+        closest_index = np.argmin(np.abs(self._xx - x))
+        return self._zz[closest_index]
 
     def _parse_color_table(self, visual_settings):
         """Parse the color table from the visual settings.
