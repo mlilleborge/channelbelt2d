@@ -163,7 +163,7 @@ class FluvialDepositionalProcess:
                 np.random.rand() < self._avulsion_parameters["outside_probability"]
             )
             if outside:
-                # Outside avulsion case:
+                # OUTSIDE AVULSION CASE:
                 # - Update topography: Aggrade using avulsion aggradation
                 self._update_topography_with_aggradation(
                     self._floodplain_aggradation_parameters["avulsion_aggradation"]
@@ -171,11 +171,10 @@ class FluvialDepositionalProcess:
                 # - Don't add a new object
 
             else:
-                # Inside avulsion case:
+                # INSIDE AVULSION: either avulse into old belt or into floodplain
                 # Update topography: Aggrade using avulsion aggradation
-                self._update_topography_with_aggradation(
-                    self._floodplain_aggradation_parameters["avulsion_aggradation"]
-                )
+                aggradation_level = self._floodplain_aggradation_parameters["avulsion_aggradation"]
+                self._update_topography_with_aggradation(aggradation_level)
 
                 # - Add a new object normally
                 potential_contributions = self._make_potential_contributions()
@@ -193,23 +192,27 @@ class FluvialDepositionalProcess:
                     self._object_parameter_distribution.draw_realization()
                 )
 
+                if self._is_at_old_object_location(location, object_parameters, self._object_type):
+                    object_parameters.superelevation += aggradation_level  # INSIDE AVULSION INTO AN OLD BELT CASE
+                # else: No adjustment of superelevation in INSIDE AVULSION INTO FLOOD PLAIN CASE
+
                 new_object = self._make_object(
                     location, object_parameters, self._object_type
                 )
 
-                # Update topography part 1: Make it shallower where top surface of new object is above old topography
+                # Update topography: Make it shallower where top surface of new object is above old topography
                 self._update_topography_with_object(new_object)
 
                 self._events.append(Event(new_object, self._zz))
 
         else:
-            # Non-avulsion (migration) case:
+            # MIGRATION CASE:
             # - Add a new object by drawing parameters and location with
             #   the previous object's parameters as the mean
             # - Update topography using non-avulsion aggradation
 
             # Get the previous object's parameters
-            if self._events:
+            if self._events:  # NB: Impossible to migrate from *nothing*
                 previous_object = self._events[-1]._object
 
                 # Update topography: Aggrade using non-avulsion aggradation
@@ -241,7 +244,7 @@ class FluvialDepositionalProcess:
                     new_location, new_object_parameters, self._object_type, forced_new_floodplain_elevation
                 )
 
-                # Update topography part 1:
+                # Update topography: Make it shallower where top surface of new object is above old topography
                 self._update_topography_with_object(new_object)
 
                 self._events.append(Event(new_object, self._zz))
@@ -318,6 +321,28 @@ class FluvialDepositionalProcess:
 
         return erodibility
 
+    def _is_at_old_object_location(self, location, object_parameters, object_type):
+        # Calculate local flood plain elevation, to see if this is shallower (as a result of a previous object)
+        if object_type == "winged_belt":
+            # Procedure to determine depth of object base:
+            x_left = location - 0.5 * object_parameters.top_belt_width
+            x_right = location + 0.5 * object_parameters.top_belt_width
+            local_floodplain_elevation = self._local_depth_in_range(x_left, x_right)
+        elif object_type == "meander_belt":
+            raise NotImplementedError(
+                "Meander belt objects not yet supported by this process."
+            )
+        elif object_type == "braided_belt":
+            raise NotImplementedError(
+                "Braided belt objects not yet supported by this process."
+            )
+        else:
+            raise ValueError(f"Unknown object type: {object_type}")
+        deepest_floodplain_elevation = self._zz.max()
+        # assume increased elevation only around previous objects
+        return local_floodplain_elevation < deepest_floodplain_elevation - 1e-6
+
+
     def _make_object(self, location, object_parameters, object_type, forced_fe=None):
         if object_type == "winged_belt":
             # Procedure to determine depth of object base:
@@ -325,8 +350,14 @@ class FluvialDepositionalProcess:
             x_right = location + 0.5 * object_parameters.top_belt_width
             local_floodplain_elevation = self._local_depth_in_range(x_left, x_right) if forced_fe is None else forced_fe
             # Procedure to determine depth of each wing: shallower than floodplain iff. wing rests on previous object
-            wing_elevation_lhs = min(local_floodplain_elevation, self._local_depth(x_left))
-            wing_elevation_rhs = min(local_floodplain_elevation, self._local_depth(x_right))
+            wing_elevation_lhs = min(
+                local_floodplain_elevation,
+                self._local_depth(x_left)
+            )
+            wing_elevation_rhs = min(
+                local_floodplain_elevation,
+                self._local_depth(x_right)
+            )
             return WingedBeltObject(
                 center_location=location,
                 floodplain_elevation=local_floodplain_elevation,
