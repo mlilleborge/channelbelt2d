@@ -342,7 +342,6 @@ class FluvialDepositionalProcess:
         # assume increased elevation only around previous objects
         return local_floodplain_elevation < deepest_floodplain_elevation - 1e-6
 
-
     def _make_object(self, location, object_parameters, object_type, forced_fe=None):
         if object_type == "winged_belt":
             # Procedure to determine depth of object base:

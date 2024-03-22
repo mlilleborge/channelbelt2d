@@ -83,6 +83,7 @@ process = FluvialDepositionalProcess(
     visual_settings=visual_settings,
 )
 
+np.random.seed(140515)
 # Draw objects
 n_objects = 150
 for i in range(n_objects):
